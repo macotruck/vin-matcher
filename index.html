@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>VIN Number Registry</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background: #f9f9f9;
+    color: #1a2e1e; /* Dark green for text */
+  }
+
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+    background: #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    margin-top: 40px;
+    border-radius: 12px;
+  }
+
+  h2 {
+    margin-bottom: 1rem;
+    color: #1a2e1e;
+  }
+
+  input, button {
+    width: 100%;
+    font-size: 1rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
+
+  input {
+    background-color: #fdfdfd;
+  }
+
+  button {
+    background-color: #45761d; /* Main button color */
+    color: white;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  button:hover {
+    background-color: #01b400; /* Hover: bright green */
+  }
+
+  #reader {
+    margin-top: 1rem;
+    display: none;
+  }
+
+  #result {
+    margin-top: 1rem;
+    font-weight: 600;
+    color: #45761d;
+  }
+
+  #authMsg {
+    color: red;
+    margin-top: 10px;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  img.logo {
+    max-width: 150px;
+    margin-bottom: 1rem;
+  }
+</style>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+
+  <!-- PIN Login Screen -->
+  <div class="container" id="auth">
+    <img src="Logo.png" alt="Company Logo" class="logo" />
+    <h2>Enter PIN to Access</h2>
+    <input type="password" id="pinInput" placeholder="Enter PIN" />
+    <button onclick="checkPIN()">Unlock</button>
+    <div id="authMsg"></div>
+  </div>
+
+  <!-- Main App Screen -->
+  <div class="container hidden" id="mainApp">
+    <img src="Logo.png" alt="Company Logo" class="logo" />
+    <h2>VIN Number Registry</h2>
+    <input type="text" id="vinInput" placeholder="Enter VIN manually" />
+    <button onclick="submitVIN()">Submit VIN</button>
+    <button onclick="startScanner()">📷 Scan Barcode</button>
+
+    <div id="reader"></div>
+    <div id="result"></div>
+    <div id="lastVin" style="margin-top: 10px; font-weight: 500;"></div>
+  </div>
+
+  <script>
+    const endpoint = "https://script.google.com/macros/s/AKfycbwH4D9fQAe22e20l15XcVE2SS05Ai4kxsqdYyvfeA06fwguhaAIWpjiM6MH2jcIJ9sUBA/exec";
+    let currentDriverPIN = null;
+
+    
+    function checkPIN() {
+  const pin = document.getElementById("pinInput").value;
+
+  fetch(`${endpoint}?pin=${encodeURIComponent(pin)}`)
+    .then(res => res.text())
+    .then(response => {
+      if (response === "OK") {
+        currentDriverPIN = pin; // ✅ Store the PIN!
+        document.getElementById("auth").classList.add("hidden");
+        document.getElementById("mainApp").classList.remove("hidden");
+      } else {
+        document.getElementById("authMsg").innerText = "❌ Incorrect PIN";
+      }
+    })
+    .catch(err => {
+      document.getElementById("authMsg").innerText = "Error checking PIN.";
+      console.error("PIN check failed:", err);
+    });
+}
+
+
+    function submitVIN(vinValue = null) {
+  const vinInput = document.getElementById('vinInput');
+  const resultBox = document.getElementById('result');
+  const lastVinBox = document.getElementById('lastVin');
+  const vin = vinValue || vinInput.value.trim();
+
+  if (!vin) return alert("Please enter or scan a VIN");
+
+  if (!currentDriverPIN) {
+    return alert("PIN missing — please refresh and login again.");
+  }
+
+  fetch(`${endpoint}?vin=${encodeURIComponent(vin)}&pin=${encodeURIComponent(currentDriverPIN)}`, {
+    method: "GET"
+  })
+    .then(res => res.text())
+    .then(text => {
+      // Temporary success/fail message
+      resultBox.innerText = `${text}`;
+      vinInput.value = ""; // Clear field
+
+      // Persistent record at bottom
+      if (text.startsWith("✅")) {
+        lastVinBox.innerText = `Last VIN submitted: ${vin}`;
+        lastVinBox.style.color = "green";
+      } else {
+        lastVinBox.innerText = `Last VIN failed: ${vin}`;
+        lastVinBox.style.color = "red";
+      }
+
+      // Disappear temporary result after 7 seconds
+      setTimeout(() => {
+        resultBox.innerText = "";
+      }, 5000);
+    })
+    .catch(err => {
+  console.error("VIN submit error:", err);
+  resultBox.innerText = "Something went wrong.";
+  resultBox.style.color = "red"; // ✅ red here too
+  lastVinBox.innerText = `Last VIN failed: ${vin}`;
+  lastVinBox.style.color = "red";
+
+  setTimeout(() => {
+    resultBox.innerText = "";
+  }, 7000);
+});
+
+}
+
+
+
+
+    function startScanner() {
+      const reader = document.getElementById("reader");
+      reader.style.display = "block";
+      const html5QrCode = new Html5Qrcode("reader");
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+          html5QrCode.stop().then(() => {
+            reader.style.display = "none";
+            document.getElementById("vinInput").value = decodedText;
+            submitVIN(decodedText);
+          });
+        },
+        (errorMessage) => {
+          // silent
+        }
+      ).catch(err => {
+        document.getElementById("result").innerText = "Scanner failed: " + err;
+        console.error(err);
+      });
+    }
+    document.getElementById("vinInput").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") {
+      submitVIN();
+      }
+  });
+      
+  </script>
+
+</body>
+</html>
