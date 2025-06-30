@@ -1,6 +1,6 @@
 # vin-matcher
 
-https://javierbgarcia.github.io/vin-matcher/?v=2
+https://macotruck.github.io/vin-matcher/
 
 # VIN Matcher App
 
